@@ -5,7 +5,7 @@ defmodule ExBank.Backend do
 
   use GenServer
 
-  alias ExBank.Account
+  alias ExBank.{Account, BackendDb}
 
   @server {:global, :backend}
 
@@ -119,9 +119,106 @@ defmodule ExBank.Backend do
   """
   def transactions(acc_no, pin), do: call({:transactions, acc_no, pin})
 
+  defp to_tuple(tuple) when is_tuple(tuple), do: tuple
+  defp to_tuple([]), do: []
+  defp to_tuple([%Account{} | _] = acc), do: Enum.map(acc, &to_tuple/1)
+
+  defp to_tuple(%Account{} = acc) do
+    {:account, acc.acc_no, acc.pin, acc.name, acc.balance, acc.transactions}
+  end
+
+  defp to_tuple(other), do: raise(ArgumentError, message: other)
+
   @doc false
   @impl GenServer
   def init([]) do
-    {:error, :noimpl}
+    {:ok, BackendDb.create_db()}
+  end
+
+  @impl GenServer
+  def handle_cast({:new_account, acc_no, pin, name}, db_ref) do
+    BackendDb.new_account(db_ref, acc_no, pin, name)
+    {:noreply, db_ref}
+  end
+
+  @impl GenServer
+  def handle_call({:get, acc_no}, _from, db_ref) do
+    case BackendDb.lookup(db_ref, acc_no) do
+      {:error, :instance} -> {:reply, {:error, :no_account}, db_ref}
+      %Account{} = acc -> {:reply, to_tuple(acc), db_ref}
+    end
+  end
+
+  def handle_call({:get_by_name, name}, _from, db_ref) do
+    {:reply, to_tuple(BackendDb.lookup_by_name(db_ref, name)), db_ref}
+  end
+
+  def handle_call(:list, _from, db_ref) do
+    {:reply, to_tuple(BackendDb.all_accounts(db_ref)), db_ref}
+  end
+
+  def handle_call({:pin_valid, acc_no, pin}, _from, db_ref) do
+    {:reply, BackendDb.is_pin_valid?(db_ref, acc_no, pin), db_ref}
+  end
+
+  def handle_call({:withdrawal, acc_no, pin, amount}, _from, db_ref) do
+    if BackendDb.is_pin_valid?(db_ref, acc_no, pin) do
+      case BackendDb.debit(db_ref, acc_no, amount) do
+        ^db_ref -> {:reply, :ok, db_ref}
+        error -> {:reply, error, db_ref}
+      end
+    else
+      {:reply, {:error, :forbidden}, db_ref}
+    end
+  end
+
+  def handle_call({:deposit, acc_no, pin, amount}, _from, db_ref) do
+    if BackendDb.is_pin_valid?(db_ref, acc_no, pin) do
+      case BackendDb.credit(db_ref, acc_no, amount) do
+        ^db_ref -> {:reply, :ok, db_ref}
+        error -> {:reply, error, db_ref}
+      end
+    else
+      {:reply, {:error, :forbidden}, db_ref}
+    end
+  end
+
+  def handle_call({:transfer, acc_no1, acc_no2, pin, amount}, _from, db_ref) do
+    case {
+      BackendDb.is_pin_valid?(db_ref, acc_no1, pin),
+      BackendDb.lookup(db_ref, acc_no2)
+    } do
+      {true, %Account{}} ->
+        case BackendDb.debit(db_ref, acc_no1, amount) do
+          ^db_ref ->
+            ^db_ref = BackendDb.credit(db_ref, acc_no2, amount)
+            {:reply, :ok, db_ref}
+
+          {:error, _} = error ->
+            {:reply, error, db_ref}
+        end
+
+      {false, _} ->
+        {:reply, {:error, :forbidden}, db_ref}
+
+      {true, {:error, :instance}} ->
+        {:reply, {:error, :no_account}, db_ref}
+    end
+  end
+
+  def handle_call({:balance, acc_no, pin}, _from, db_ref) do
+    if BackendDb.is_pin_valid?(db_ref, acc_no, pin) do
+      {:reply, {:ok, BackendDb.lookup(db_ref, acc_no).balance}, db_ref}
+    else
+      {:reply, {:error, :forbidden}, db_ref}
+    end
+  end
+
+  def handle_call({:transactions, acc_no, pin}, _from, db_ref) do
+    if BackendDb.is_pin_valid?(db_ref, acc_no, pin) do
+      {:reply, {:ok, BackendDb.lookup(db_ref, acc_no).transactions}, db_ref}
+    else
+      {:reply, {:error, :forbidden}, db_ref}
+    end
   end
 end

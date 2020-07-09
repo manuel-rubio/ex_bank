@@ -46,7 +46,7 @@ defmodule ExBank.BackendTest do
                {:account, 1, "1234", "ESL", 0, []},
                {:account, 2, "2345", "Plataformatec", 0, []},
                {:account, 3, "3456", "Dashbit", 0, []}
-             ] == Enum.sort(Backend.list())
+             ] == Enum.take(Enum.sort(Backend.list()), 3)
     end
   end
 
@@ -170,6 +170,46 @@ defmodule ExBank.BackendTest do
 
     test "unsucessfully (forbidden)" do
       assert {:error, :forbidden} == Backend.transactions(5, "1234")
+    end
+  end
+
+  describe "using demo data" do
+    setup do
+      {:ok, _} = Backend.start_link()
+      :ok
+    end
+
+    test "full running" do
+      assert {:account, 100, "1234", "Henry Nystrom", 100, [{:credit, _, 100}]} = Backend.get(100)
+      assert {:error, :no_account} = Backend.get(70)
+
+      assert [
+               {:account, 100, "1234", "Henry Nystrom", 100, [{:credit, _, 100}]},
+               {:account, 400, "1234", "Henry Nystrom", 5000, [{:credit, _, 5000}]}
+             ] = Enum.sort(Backend.get_by_name("Henry Nystrom"))
+
+      assert [
+               {:account, 100, "1234", "Henry Nystrom", 100, [{:credit, _, 100}]},
+               {:account, 200, "4321", "Martin Gausby", 200, [{:credit, _, 200}]},
+               {:account, 300, "1111", "Gabor Olah", 1000, [{:credit, _, 1000}]},
+               {:account, 400, "1234", "Henry Nystrom", 5000, [{:credit, _, 5000}]}
+             ] = Enum.sort(Backend.list())
+
+      assert Backend.pin_valid?(100, "1234")
+      refute Backend.pin_valid?(100, "1111")
+      assert :ok == Backend.withdrawal(100, "1234", 10)
+      assert {:error, :balance} == Backend.withdrawal(100, "1234", 100)
+      assert :ok == Backend.deposit(100, "1234", 100)
+      assert :ok == Backend.transfer(100, 400, "1234", 100)
+      assert {:ok, 90} == Backend.balance(100, "1234")
+
+      assert {:ok,
+              [
+                {:debit, _, 100},
+                {:credit, _, 100},
+                {:debit, _, 10},
+                {:credit, _, 100}
+              ]} = Backend.transactions(100, "1234")
     end
   end
 end
