@@ -38,7 +38,7 @@ defmodule ExBank.Backend do
           Account.transactions()
         }
 
-  @spec get(Account.acc_no()) :: account() | {:error, :no_acount}
+  @spec get(Account.acc_no()) :: account() | {:error, :no_account}
   @doc """
   Return the account information specified by the account number. In case
   the account does not exist, return the tuple {:error, :no_account}.
@@ -132,7 +132,14 @@ defmodule ExBank.Backend do
   @doc false
   @impl GenServer
   def init([]) do
-    {:ok, BackendDb.create_db()}
+    db_ref = BackendDb.create_db()
+
+    for {acc_no, name, pin, balance} <- Application.get_env(:ex_bank, :demo_data) do
+      BackendDb.new_account(db_ref, acc_no, pin, name)
+      BackendDb.credit(db_ref, acc_no, balance)
+    end
+
+    {:ok, db_ref}
   end
 
   @impl GenServer

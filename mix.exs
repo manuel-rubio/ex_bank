@@ -22,6 +22,7 @@ defmodule ExBank.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
+      {:gen_state_machine, "~> 2.1.0"},
       {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false}
     ]
   end
