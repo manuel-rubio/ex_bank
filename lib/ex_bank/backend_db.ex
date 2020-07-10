@@ -9,7 +9,7 @@ defmodule ExBank.BackendDb do
   :set. The function should return the ETS table name.
   """
   def create_db() do
-    {:error, :noimpl}
+    :ets.new(:accounts, [:named_table, :set, :public])
   end
 
   @spec lookup(db_ref(), Account.acc_no()) :: Account.t() | {:error, :instance}
@@ -28,7 +28,10 @@ defmodule ExBank.BackendDb do
       %{acc_no: 1, balance: 100, name: "ESL"}
   """
   def lookup(db_ref, acc_no) do
-    {:error, :noimpl}
+    case :ets.lookup(db_ref, acc_no) do
+      [{^acc_no, _name, account}] -> account
+      [] -> {:error, :instance}
+    end
   end
 
   @spec lookup_by_name(db_ref(), Account.name()) :: [Account.t()]
@@ -47,8 +50,9 @@ defmodule ExBank.BackendDb do
       [%{acc_no: 1, balance: 100, name: "ESL"}]
   """
   def lookup_by_name(db_ref, name) do
-    #  Hint: Use :ets.match/2.
-    {:error, :noimpl}
+    db_ref
+    |> :ets.match({:_, name, :"$1"})
+    |> List.flatten()
   end
 
   @spec new_account(db_ref(), Account.acc_no(), Account.pin(), Account.name()) ::
@@ -61,7 +65,14 @@ defmodule ExBank.BackendDb do
   the table name.
   """
   def new_account(db_ref, acc_no, pin, name) do
-    {:error, :noimpl}
+    case lookup(db_ref, acc_no) do
+      {:error, :instance} ->
+        true = :ets.insert(db_ref, {acc_no, name, Account.new(acc_no, pin, name)})
+        db_ref
+
+      %Account{} ->
+        {:error, :exists}
+    end
   end
 
   @spec credit(db_ref(), Account.acc_no(), Account.amount()) :: db_ref() | {:error, :instance}
@@ -75,7 +86,15 @@ defmodule ExBank.BackendDb do
   parameter is the table name.
   """
   def credit(db_ref, acc_no, amount) do
-    {:error, :noimpl}
+    case lookup(db_ref, acc_no) do
+      {:error, _} = error ->
+        error
+
+      %Account{name: name} = acc ->
+        acc = Account.increase_balance(acc, amount)
+        :ets.insert(db_ref, {acc_no, name, acc})
+        db_ref
+    end
   end
 
   @spec debit(db_ref(), Account.acc_no(), Account.amount()) ::
@@ -91,7 +110,20 @@ defmodule ExBank.BackendDb do
   is the table name.
   """
   def debit(db_ref, acc_no, amount) do
-    {:error, :noimpl}
+    case lookup(db_ref, acc_no) do
+      {:error, _} = error ->
+        error
+
+      %Account{} = acc ->
+        case Account.decrease_balance(acc, amount) do
+          {:error, _} = error ->
+            error
+
+          %Account{name: name} = acc ->
+            :ets.insert(db_ref, {acc_no, name, acc})
+            db_ref
+        end
+    end
   end
 
   @spec is_pin_valid?(db_ref(), Account.acc_no(), Account.pin()) :: boolean()
@@ -114,7 +146,10 @@ defmodule ExBank.BackendDb do
       false
   """
   def is_pin_valid?(db_ref, acc_no, pin) do
-    {:error, :noimpl}
+    case lookup(db_ref, acc_no) do
+      %Account{pin: ^pin} -> true
+      _ -> false
+    end
   end
 
   @spec all_accounts(db_ref()) :: [Account.t()]
@@ -123,8 +158,7 @@ defmodule ExBank.BackendDb do
   parameter.
   """
   def all_accounts(db_ref) do
-    # Hint: Use :ets.tab2list/1.
-    {:error, :noimpl}
+    for {_acc_no, _name, content} <- :ets.tab2list(db_ref), do: content
   end
 
   @spec close(db_ref()) :: :ok
@@ -132,6 +166,7 @@ defmodule ExBank.BackendDb do
   Delete the ETS table specified by the parameter.
   """
   def close(db_ref) do
-    {:error, :noimpl}
+    true = :ets.delete(db_ref)
+    :ok
   end
 end
