@@ -4,12 +4,31 @@ defmodule ExBank.AtmTest do
   alias ExBank.{Atm, Backend}
 
   setup do
+    interface =
+      spawn_link(fn ->
+        receive do
+          :ok -> :ok
+        end
+      end)
+
     {:ok, _} = Backend.start_link()
-    {:ok, atm} = Atm.start_link()
-    %{atm: atm}
+    {:ok, atm} = Atm.start_link(interface)
+    %{atm: atm, interface: interface}
   end
 
   describe "idle:" do
+    test "ensure interface was registered", %{atm: atm, interface: interface} do
+      assert {:idle, %{interface: ^interface}} = :sys.get_state(atm)
+    end
+
+    test "ensure atm is stopping caller is stopped", %{atm: atm, interface: interface} do
+      Process.monitor(atm)
+      Process.monitor(interface)
+      send(interface, :ok)
+      assert_receive {:DOWN, _ref, :process, ^interface, :normal}
+      assert_receive {:DOWN, _ref, :process, ^atm, :normal}, 500
+    end
+
     test "trying invalid card", %{atm: atm} do
       acc_no = 101
       assert :invalid_card = GenStateMachine.call(atm, {:card_inserted, acc_no})
