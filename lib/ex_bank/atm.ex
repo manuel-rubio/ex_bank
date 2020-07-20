@@ -72,7 +72,7 @@ defmodule ExBank.Atm do
 
       {:account, _acc_no, _pin, _name, _balance, _trans} ->
         data = %Data{data | acc_no: acc_no}
-        actions = [{:reply, from, :ask_pin}]
+        actions = [{:reply, from, :ask_pin}, timeout()]
         {:next_state, :get_pin, data, actions}
     end
   end
@@ -95,12 +95,12 @@ defmodule ExBank.Atm do
   Implements the "get_pin" state.
   """
   def get_pin({:call, from}, {:digit, _}, %Data{digits: d}) when byte_size(d) >= 4 do
-    actions = [{:reply, from, :no_more_digits}]
+    actions = [{:reply, from, :no_more_digits}, timeout()]
     {:keep_state_and_data, actions}
   end
 
   def get_pin({:call, from}, {:digit, d}, data) do
-    actions = [{:reply, from, :more_digits}]
+    actions = [{:reply, from, :more_digits}, timeout()]
     data = %Data{data | digits: data.digits <> d}
     {:keep_state, data, actions}
   end
@@ -108,22 +108,22 @@ defmodule ExBank.Atm do
   def get_pin({:call, from}, :enter, data) do
     if Backend.pin_valid?(data.acc_no, data.digits) do
       data = %Data{data | digits: "", pin: data.digits}
-      actions = [{:reply, from, :choose_option}]
+      actions = [{:reply, from, :choose_option}, timeout()]
       {:next_state, :selection, data, actions}
     else
-      actions = [{:reply, from, :invalid_pin}]
+      actions = [{:reply, from, :invalid_pin}, timeout()]
       {:keep_state_and_data, actions}
     end
   end
 
   def get_pin({:call, from}, :clear, data) do
     data = %Data{data | digits: ""}
-    actions = [{:reply, from, :ok}]
+    actions = [{:reply, from, :ok}, timeout()]
     {:keep_state, data, actions}
   end
 
-  def get_pin({:call, from}, :cancel, _data) do
-    data = %Data{}
+  def get_pin({:call, from}, :cancel, data) do
+    data = %Data{data | digits: "", acc_no: nil}
     actions = [{:reply, from, :ok}]
     {:next_state, :idle, data, actions}
   end
@@ -133,8 +133,12 @@ defmodule ExBank.Atm do
     {:stop_and_reply, :normal, replies, data}
   end
 
+  def get_pin(:timeout, _time, data) do
+    {:next_state, :timeout, data, [{:next_event, :internal, :timeout}]}
+  end
+
   def get_pin({:call, from}, _whatever, _data) do
-    actions = [{:reply, from, :invalid_option}]
+    actions = [{:reply, from, :invalid_option}, timeout()]
     {:keep_state_and_data, actions}
   end
 
@@ -147,23 +151,23 @@ defmodule ExBank.Atm do
   """
   def selection({:call, from}, {:selection, :balance}, data) do
     {:ok, balance} = Backend.balance(data.acc_no, data.pin)
-    actions = [{:reply, from, {:balance, balance}}]
+    actions = [{:reply, from, {:balance, balance}}, timeout()]
     {:keep_state_and_data, actions}
   end
 
   def selection({:call, from}, {:selection, :statement}, data) do
     {:ok, transactions} = Backend.transactions(data.acc_no, data.pin)
-    actions = [{:reply, from, {:statement, transactions}}]
+    actions = [{:reply, from, {:statement, transactions}}, timeout()]
     {:keep_state_and_data, actions}
   end
 
   def selection({:call, from}, {:selection, :withdraw}, data) do
-    actions = [{:reply, from, :ask_amount}]
+    actions = [{:reply, from, :ask_amount}, timeout()]
     {:next_state, :withdraw, data, actions}
   end
 
-  def selection({:call, from}, :cancel, _data) do
-    data = %Data{}
+  def selection({:call, from}, :cancel, data) do
+    data = %Data{data | pin: "", acc_no: nil}
     actions = [{:reply, from, :ok}]
     {:next_state, :idle, data, actions}
   end
@@ -173,8 +177,12 @@ defmodule ExBank.Atm do
     {:stop_and_reply, :normal, replies, data}
   end
 
+  def selection(:timeout, _time, data) do
+    {:next_state, :timeout, data, [{:next_event, :internal, :timeout}]}
+  end
+
   def selection({:call, from}, _whatever, _data) do
-    actions = [{:reply, from, :invalid_option}]
+    actions = [{:reply, from, :invalid_option}, timeout()]
     {:keep_state_and_data, actions}
   end
 
@@ -186,12 +194,12 @@ defmodule ExBank.Atm do
   Implements "withdraw".
   """
   def withdraw({:call, from}, {:digit, _}, %Data{digits: d}) when byte_size(d) >= 6 do
-    actions = [{:reply, from, :no_more_digits}]
+    actions = [{:reply, from, :no_more_digits}, timeout()]
     {:keep_state_and_data, actions}
   end
 
   def withdraw({:call, from}, {:digit, d}, data) do
-    actions = [{:reply, from, :more_digits}]
+    actions = [{:reply, from, :more_digits}, timeout()]
     data = %Data{data | digits: data.digits <> d}
     {:keep_state, data, actions}
   end
@@ -201,23 +209,23 @@ defmodule ExBank.Atm do
 
     case Backend.withdrawal(data.acc_no, data.pin, amount) do
       :ok ->
-        actions = [{:reply, from, :success_withdraw}]
+        actions = [{:reply, from, :success_withdraw}, timeout()]
         {:next_state, :selection, data, actions}
 
       {:error, :balance} ->
-        actions = [{:reply, from, :no_balance}]
+        actions = [{:reply, from, :no_balance}, timeout()]
         {:keep_state_and_data, actions}
     end
   end
 
   def withdraw({:call, from}, :clear, data) do
     data = %Data{data | digits: ""}
-    actions = [{:reply, from, :ok}]
+    actions = [{:reply, from, :ok}, timeout()]
     {:keep_state, data, actions}
   end
 
-  def withdraw({:call, from}, :cancel, _data) do
-    data = %Data{}
+  def withdraw({:call, from}, :cancel, data) do
+    data = %Data{data | acc_no: nil, digits: "", pin: ""}
     actions = [{:reply, from, :ok}]
     {:next_state, :idle, data, actions}
   end
@@ -227,13 +235,30 @@ defmodule ExBank.Atm do
     {:stop_and_reply, :normal, replies, data}
   end
 
+  def withdraw(:timeout, _time, data) do
+    {:next_state, :timeout, data, [{:next_event, :internal, :timeout}]}
+  end
+
   def withdraw({:call, from}, _whatever, _data) do
-    actions = [{:reply, from, :invalid_option}]
+    actions = [{:reply, from, :invalid_option}, timeout()]
     {:keep_state_and_data, actions}
   end
 
   def withdraw(:info, {:DOWN, _ref, :process, interface, reason}, %Data{interface: interface}) do
     {:stop, reason}
+  end
+
+  @doc """
+  Implements timeout state.
+  """
+  def timeout(:internal, :timeout, %Data{interface: interface} = data) do
+    GenServer.cast(interface, :timeout)
+    {:next_state, :idle, %Data{data | acc_no: nil, pin: "", digits: ""}}
+  end
+
+  def timeout({:call, from}, _whatever, _data) do
+    actions = [{:reply, from, :invalid_option}]
+    {:keep_state_and_data, actions}
   end
 
   defp timeout() do

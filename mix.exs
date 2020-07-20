@@ -7,7 +7,8 @@ defmodule ExBank.MixProject do
       version: "0.1.0",
       elixir: "~> 1.9",
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      aliases: aliases()
     ]
   end
 
@@ -25,5 +26,9 @@ defmodule ExBank.MixProject do
       {:gen_state_machine, "~> 2.1.0"},
       {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false}
     ]
+  end
+
+  defp aliases do
+    [test: "test --no-start"]
   end
 end
