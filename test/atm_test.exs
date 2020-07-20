@@ -256,4 +256,57 @@ defmodule ExBank.AtmTest do
       refute Process.alive?(atm)
     end
   end
+
+  describe "timeouts: " do
+    test "receiving timeout" do
+      Application.put_env(:ex_bank, :timeout, 100)
+      acc_no = 100
+
+      # start new ATM
+      assert {:ok, pid} = Atm.start_link(self())
+
+      # move to the get_pin state
+      assert :ask_pin = GenStateMachine.call(pid, {:card_inserted, acc_no})
+      assert_receive {:"$gen_cast", :timeout}, 500
+
+      # move to the get_pin state again
+      assert :ask_pin = GenStateMachine.call(pid, {:card_inserted, acc_no})
+      assert_receive {:"$gen_cast", :timeout}, 500
+    end
+
+    test "get_pin timeout" do
+      Application.put_env(:ex_bank, :timeout, 100)
+      acc_no = 100
+      assert {:ok, pid} = Atm.start_link(self())
+      assert :ask_pin = GenStateMachine.call(pid, {:card_inserted, acc_no})
+      assert_receive {:"$gen_cast", :timeout}, 500
+    end
+
+    test "selection timeout" do
+      Application.put_env(:ex_bank, :timeout, 100)
+      acc_no = 100
+      assert {:ok, pid} = Atm.start_link(self())
+      assert :ask_pin = GenStateMachine.call(pid, {:card_inserted, acc_no})
+      assert :more_digits = GenStateMachine.call(pid, {:digit, "1"})
+      assert :more_digits = GenStateMachine.call(pid, {:digit, "2"})
+      assert :more_digits = GenStateMachine.call(pid, {:digit, "3"})
+      assert :more_digits = GenStateMachine.call(pid, {:digit, "4"})
+      assert :choose_option = GenStateMachine.call(pid, :enter)
+      assert_receive {:"$gen_cast", :timeout}, 500
+    end
+
+    test "withdraw timeout" do
+      Application.put_env(:ex_bank, :timeout, 100)
+      acc_no = 100
+      assert {:ok, pid} = Atm.start_link(self())
+      assert :ask_pin = GenStateMachine.call(pid, {:card_inserted, acc_no})
+      assert :more_digits = GenStateMachine.call(pid, {:digit, "1"})
+      assert :more_digits = GenStateMachine.call(pid, {:digit, "2"})
+      assert :more_digits = GenStateMachine.call(pid, {:digit, "3"})
+      assert :more_digits = GenStateMachine.call(pid, {:digit, "4"})
+      assert :choose_option = GenStateMachine.call(pid, :enter)
+      assert :ask_amount = GenStateMachine.call(pid, {:selection, :withdraw})
+      assert_receive {:"$gen_cast", :timeout}, 500
+    end
+  end
 end

@@ -8,6 +8,8 @@ defmodule ExBank.Atm do
 
   alias ExBank.{Account, Backend}
 
+  @default_timeout 10_000
+
   defmodule Data do
     @moduledoc """
     Data module stores the information for the state
@@ -16,28 +18,31 @@ defmodule ExBank.Atm do
     @type t() :: %ExBank.Atm.Data{
             acc_no: nil | Account.acc_no(),
             pin: String.t(),
-            digits: String.t()
+            digits: String.t(),
+            interface: pid()
           }
 
     defstruct acc_no: nil,
               pin: "",
-              digits: ""
+              digits: "",
+              interface: nil
   end
 
-  @spec start_link() :: :gen_statem.start_ret()
+  @spec start_link(pid()) :: :gen_statem.start_ret()
   @doc """
   Starts the state machine. A PID must be provided to know where to
   send async events (for the interface) when they are needed to be
   reported.
   """
-  def start_link() do
-    GenStateMachine.start_link(__MODULE__, [])
+  def start_link(interface) do
+    GenStateMachine.start_link(__MODULE__, [interface])
   end
 
   @impl GenStateMachine
   @doc false
-  def init([]) do
-    {:ok, :idle, %Data{}}
+  def init([interface]) do
+    Process.monitor(interface)
+    {:ok, :idle, %Data{interface: interface}}
   end
 
   @type action() :: :withdraw | :balance | :statement
@@ -80,6 +85,10 @@ defmodule ExBank.Atm do
   def idle({:call, from}, _whatever, _data) do
     actions = [{:reply, from, :invalid_option}]
     {:keep_state_and_data, actions}
+  end
+
+  def idle(:info, {:DOWN, _ref, :process, interface, reason}, %Data{interface: interface}) do
+    {:stop, reason}
   end
 
   @doc """
@@ -129,6 +138,10 @@ defmodule ExBank.Atm do
     {:keep_state_and_data, actions}
   end
 
+  def get_pin(:info, {:DOWN, _ref, :process, interface, reason}, %Data{interface: interface}) do
+    {:stop, reason}
+  end
+
   @doc """
   Implements "selection"
   """
@@ -163,6 +176,10 @@ defmodule ExBank.Atm do
   def selection({:call, from}, _whatever, _data) do
     actions = [{:reply, from, :invalid_option}]
     {:keep_state_and_data, actions}
+  end
+
+  def selection(:info, {:DOWN, _ref, :process, interface, reason}, %Data{interface: interface}) do
+    {:stop, reason}
   end
 
   @doc """
@@ -213,5 +230,13 @@ defmodule ExBank.Atm do
   def withdraw({:call, from}, _whatever, _data) do
     actions = [{:reply, from, :invalid_option}]
     {:keep_state_and_data, actions}
+  end
+
+  def withdraw(:info, {:DOWN, _ref, :process, interface, reason}, %Data{interface: interface}) do
+    {:stop, reason}
+  end
+
+  defp timeout() do
+    Application.get_env(:ex_bank, :timeout, @default_timeout)
   end
 end

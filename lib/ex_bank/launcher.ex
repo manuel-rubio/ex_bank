@@ -5,6 +5,8 @@ defmodule ExBank.Launcher do
   """
   use GenServer
 
+  alias ExBank.Atm
+
   @server {:global, :atm_launcher}
 
   @doc """
@@ -18,6 +20,13 @@ defmodule ExBank.Launcher do
   @impl GenServer
   @doc false
   def init([]) do
-    :noimpl
+    {:ok, %{}}
+  end
+
+  @impl GenServer
+  @doc false
+  def handle_call({:start_atm, caller}, _from, state) do
+    {:ok, atm} = Atm.start_link(caller)
+    {:reply, {:ok, atm}, state}
   end
 end
