@@ -8,13 +8,14 @@ defmodule ExBank.Launcher do
   alias ExBank.Atm
 
   @server {:global, :atm_launcher}
+  @supervisor ExBank.Atm.Supervisor
 
   @doc """
   Starts the launcher registering as a global process to be
   reachable from other connected nodes.
   """
-  def start_link() do
-    GenServer.start_link(__MODULE__, [], name: @server)
+  def start_link(args \\ []) do
+    GenServer.start_link(__MODULE__, args, name: @server)
   end
 
   @impl GenServer
@@ -26,7 +27,7 @@ defmodule ExBank.Launcher do
   @impl GenServer
   @doc false
   def handle_call({:start_atm, caller}, _from, state) do
-    {:ok, atm} = Atm.start_link(caller)
+    {:ok, atm} = DynamicSupervisor.start_child(@supervisor, {Atm, caller})
     {:reply, {:ok, atm}, state}
   end
 end

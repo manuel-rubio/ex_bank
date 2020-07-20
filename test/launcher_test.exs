@@ -5,6 +5,9 @@ defmodule ExBank.LauncherTest do
 
   describe "launching: " do
     setup do
+      assert {:ok, _pid} =
+               DynamicSupervisor.start_link(strategy: :one_for_one, name: ExBank.Atm.Supervisor)
+
       assert {:ok, _pid} = ExBank.Launcher.start_link()
       :ok
     end

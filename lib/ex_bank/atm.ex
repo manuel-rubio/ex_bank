@@ -4,7 +4,7 @@ defmodule ExBank.Atm do
   interact with the backend handling the input from the
   ATM web interface and sending the output to be handled.
   """
-  use GenStateMachine, callback_mode: :state_functions
+  use GenStateMachine, callback_mode: :state_functions, restart: :temporary
 
   alias ExBank.{Account, Backend}
 

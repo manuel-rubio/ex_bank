@@ -14,8 +14,8 @@ defmodule ExBank.Backend do
   For now we will not do anything with the argument passed in, but we need
   it for later.
   """
-  def start_link() do
-    GenServer.start_link(__MODULE__, [], name: @server)
+  def start_link(args \\ []) do
+    GenServer.start_link(__MODULE__, args, name: @server)
   end
 
   @doc """
@@ -25,9 +25,8 @@ defmodule ExBank.Backend do
     GenServer.stop(@server)
   end
 
-  defp call(msg) do
-    GenServer.call(@server, msg)
-  end
+  defp call(msg), do: GenServer.call(@server, msg)
+  defp cast(msg), do: GenServer.cast(@server, msg)
 
   @type account() :: {
           :account,
@@ -56,9 +55,7 @@ defmodule ExBank.Backend do
   @doc """
   Create a new account passing the account number, pin and name as parameters.
   """
-  def new_account(acc_no, pin, name) do
-    GenServer.cast(@server, {:new_account, acc_no, pin, name})
-  end
+  def new_account(acc_no, pin, name), do: cast({:new_account, acc_no, pin, name})
 
   @spec list() :: [account()]
   @doc """
@@ -118,6 +115,18 @@ defmodule ExBank.Backend do
   Return the list of transactions.
   """
   def transactions(acc_no, pin), do: call({:transactions, acc_no, pin})
+
+  @spec block(Account.acc_no()) :: :ok
+  @doc """
+  Blocks an account.
+  """
+  def block(acc_no), do: cast({:block, acc_no})
+
+  @spec unblock(Account.acc_no()) :: :ok
+  @doc """
+  Unblocks an account.
+  """
+  def unblock(acc_no), do: cast({:unblock, acc_no})
 
   defp to_tuple(tuple) when is_tuple(tuple), do: tuple
   defp to_tuple([]), do: []

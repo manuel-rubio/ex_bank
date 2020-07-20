@@ -12,6 +12,7 @@ defmodule ExBank.Account do
   @type name() :: String.t()
   @type amount() :: non_neg_integer()
   @type transaction_type() :: :credit | :debit
+  @type block() :: boolean()
 
   @type transaction() :: {
           transaction_type(),
@@ -25,7 +26,8 @@ defmodule ExBank.Account do
           pin: pin(),
           name: name(),
           balance: amount(),
-          transactions: transactions()
+          transactions: transactions(),
+          blocked: boolean()
         }
 
   defstruct [

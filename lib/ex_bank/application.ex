@@ -7,13 +7,16 @@ defmodule ExBank.Application do
 
   def start(_type, _args) do
     children = [
-      # Starts a worker by calling: ExBank.Worker.start_link(arg)
-      # {ExBank.Worker, arg}
+      {ExBank.Backend, []},
+      {DynamicSupervisor, strategy: :one_for_one, name: ExBank.Atm.Supervisor},
+      {ExBank.Launcher, []},
+      {ExBank.EventManager, []},
+      {ExBank.EventManager.Supervisor, []}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
-    opts = [strategy: :one_for_one, name: ExBank.Supervisor]
+    opts = [strategy: :rest_for_one, name: ExBank.Supervisor]
     Supervisor.start_link(children, opts)
   end
 end

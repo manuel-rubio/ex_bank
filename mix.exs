@@ -24,6 +24,7 @@ defmodule ExBank.MixProject do
   defp deps do
     [
       {:gen_state_machine, "~> 2.1.0"},
+      {:gen_stage, "~> 1.0"},
       {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false}
     ]
   end

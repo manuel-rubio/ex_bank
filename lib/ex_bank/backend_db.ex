@@ -144,6 +144,13 @@ defmodule ExBank.BackendDb do
       iex> |> BackendDb.new_account(1, "1234", "ESL")
       iex> |> BackendDb.is_pin_valid?(1, "4321")
       false
+
+      iex> alias ExBank.BackendDb
+      iex> BackendDb.create_db()
+      iex> |> BackendDb.new_account(1, "1234", "ESL")
+      iex> |> BackendDb.block(1)
+      iex> |> BackendDb.is_pin_valid?(1, "1234")
+      false
   """
   def is_pin_valid?(db_ref, acc_no, pin) do
     case lookup(db_ref, acc_no) do
@@ -168,5 +175,21 @@ defmodule ExBank.BackendDb do
   def close(db_ref) do
     true = :ets.delete(db_ref)
     :ok
+  end
+
+  @spec block(db_ref(), Account.acc_no()) :: db_ref()
+  @doc """
+  Block an account.
+  """
+  def block(db_ref, acc_no) do
+    throw({:error, :noimpl})
+  end
+
+  @spec unblock(db_ref(), Account.acc_no()) :: db_ref()
+  @doc """
+  Unblock an account.
+  """
+  def unblock(db_ref, acc_no) do
+    throw({:error, :noimpl})
   end
 end
