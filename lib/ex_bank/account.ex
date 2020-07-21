@@ -35,7 +35,8 @@ defmodule ExBank.Account do
     :pin,
     :name,
     balance: 0,
-    transactions: []
+    transactions: [],
+    blocked: false
   ]
 
   @spec new(acc_no(), pin(), name()) :: t()
@@ -72,6 +73,15 @@ defmodule ExBank.Account do
   @spec is_pin_valid?(t(), pin()) :: boolean()
   def is_pin_valid?(%Account{pin: pin}, pin), do: true
   def is_pin_valid?(%Account{}, _pin), do: false
+
+  @spec block(t()) :: t()
+  def block(%Account{} = account), do: %Account{account | blocked: true}
+
+  @spec unblock(t()) :: t()
+  def unblock(%Account{} = account), do: %Account{account | blocked: false}
+
+  @spec is_blocked?(t()) :: boolean()
+  def is_blocked?(%Account{blocked: blocked}), do: blocked
 
   defimpl String.Chars, for: Account do
     alias ExBank.Account

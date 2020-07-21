@@ -5,7 +5,7 @@ defmodule ExBank.Backend do
 
   use GenServer
 
-  alias ExBank.{Account, BackendDb}
+  alias ExBank.{Account, BackendDb, EventManager}
 
   @server {:global, :backend}
 
@@ -157,6 +157,18 @@ defmodule ExBank.Backend do
     {:noreply, db_ref}
   end
 
+  def handle_cast({:block, acc_no}, db_ref) do
+    BackendDb.block(db_ref, acc_no)
+    EventManager.notify({:account_blocked, acc_no})
+    {:noreply, db_ref}
+  end
+
+  def handle_cast({:unblock, acc_no}, db_ref) do
+    BackendDb.unblock(db_ref, acc_no)
+    EventManager.notify({:account_unblocked, acc_no})
+    {:noreply, db_ref}
+  end
+
   @impl GenServer
   def handle_call({:get, acc_no}, _from, db_ref) do
     case BackendDb.lookup(db_ref, acc_no) do
@@ -174,14 +186,24 @@ defmodule ExBank.Backend do
   end
 
   def handle_call({:pin_valid, acc_no, pin}, _from, db_ref) do
-    {:reply, BackendDb.is_pin_valid?(db_ref, acc_no, pin), db_ref}
+    if BackendDb.is_pin_valid?(db_ref, acc_no, pin) do
+      EventManager.notify({:valid_pin, acc_no})
+      {:reply, true, db_ref}
+    else
+      EventManager.notify({:invalid_pin, acc_no})
+      {:reply, false, db_ref}
+    end
   end
 
   def handle_call({:withdrawal, acc_no, pin, amount}, _from, db_ref) do
     if BackendDb.is_pin_valid?(db_ref, acc_no, pin) do
       case BackendDb.debit(db_ref, acc_no, amount) do
-        ^db_ref -> {:reply, :ok, db_ref}
-        error -> {:reply, error, db_ref}
+        ^db_ref ->
+          EventManager.notify({:withdraw, amount})
+          {:reply, :ok, db_ref}
+
+        error ->
+          {:reply, error, db_ref}
       end
     else
       {:reply, {:error, :forbidden}, db_ref}
@@ -191,8 +213,12 @@ defmodule ExBank.Backend do
   def handle_call({:deposit, acc_no, pin, amount}, _from, db_ref) do
     if BackendDb.is_pin_valid?(db_ref, acc_no, pin) do
       case BackendDb.credit(db_ref, acc_no, amount) do
-        ^db_ref -> {:reply, :ok, db_ref}
-        error -> {:reply, error, db_ref}
+        ^db_ref ->
+          EventManager.notify({:deposit, amount})
+          {:reply, :ok, db_ref}
+
+        error ->
+          {:reply, error, db_ref}
       end
     else
       {:reply, {:error, :forbidden}, db_ref}
@@ -208,6 +234,7 @@ defmodule ExBank.Backend do
         case BackendDb.debit(db_ref, acc_no1, amount) do
           ^db_ref ->
             ^db_ref = BackendDb.credit(db_ref, acc_no2, amount)
+            EventManager.notify({:transfer, amount})
             {:reply, :ok, db_ref}
 
           {:error, _} = error ->

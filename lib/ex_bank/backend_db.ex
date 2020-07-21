@@ -154,7 +154,7 @@ defmodule ExBank.BackendDb do
   """
   def is_pin_valid?(db_ref, acc_no, pin) do
     case lookup(db_ref, acc_no) do
-      %Account{pin: ^pin} -> true
+      %Account{pin: ^pin, blocked: false} -> true
       _ -> false
     end
   end
@@ -182,7 +182,15 @@ defmodule ExBank.BackendDb do
   Block an account.
   """
   def block(db_ref, acc_no) do
-    throw({:error, :noimpl})
+    case lookup(db_ref, acc_no) do
+      {:error, _} ->
+        :ok
+
+      %Account{name: name} = acc ->
+        acc = Account.block(acc)
+        :ets.insert(db_ref, {acc_no, name, acc})
+        db_ref
+    end
   end
 
   @spec unblock(db_ref(), Account.acc_no()) :: db_ref()
@@ -190,6 +198,14 @@ defmodule ExBank.BackendDb do
   Unblock an account.
   """
   def unblock(db_ref, acc_no) do
-    throw({:error, :noimpl})
+    case lookup(db_ref, acc_no) do
+      {:error, _} ->
+        :ok
+
+      %Account{name: name} = acc ->
+        acc = Account.unblock(acc)
+        :ets.insert(db_ref, {acc_no, name, acc})
+        db_ref
+    end
   end
 end
