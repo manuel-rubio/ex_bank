@@ -8,6 +8,7 @@ defmodule ExBank.EventManager.Supervisor do
   @impl Supervisor
   def init(_init_args) do
     children = [
+      {ExBank.EventManager.Alarm, []},
       {ExBank.EventManager.Stolen, []},
       {ExBank.EventManager.Statistics, []}
     ]

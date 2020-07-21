@@ -7,6 +7,7 @@ defmodule ExBank.MixProject do
       version: "0.1.0",
       elixir: "~> 1.9",
       start_permanent: Mix.env() == :prod,
+      build_embedded: Mix.env() == :prod,
       deps: deps(),
       aliases: aliases()
     ]
@@ -15,7 +16,7 @@ defmodule ExBank.MixProject do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger],
+      extra_applications: [:logger, :sasl],
       mod: {ExBank.Application, []}
     ]
   end
@@ -25,6 +26,7 @@ defmodule ExBank.MixProject do
     [
       {:gen_state_machine, "~> 2.1.0"},
       {:gen_stage, "~> 1.0"},
+      {:logger_file_backend, "~> 0.0.11"},
       {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false}
     ]
   end
