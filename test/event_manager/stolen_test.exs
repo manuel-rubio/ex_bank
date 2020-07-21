@@ -1,5 +1,5 @@
 defmodule ExBank.EventManager.StolenTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: false
 
   alias ExBank.EventManager
   alias ExBank.EventManager.Stolen

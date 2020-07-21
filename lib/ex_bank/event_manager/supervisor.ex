@@ -8,7 +8,8 @@ defmodule ExBank.EventManager.Supervisor do
   @impl Supervisor
   def init(_init_args) do
     children = [
-      {ExBank.EventManager.Stolen, []}
+      {ExBank.EventManager.Stolen, []},
+      {ExBank.EventManager.Statistics, []}
     ]
 
     Supervisor.init(children, strategy: :one_for_one)
