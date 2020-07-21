@@ -36,7 +36,7 @@ defmodule ExBank.EventManager do
   end
 
   @impl GenStage
-  def handle_demand(demand, state) do
+  def handle_demand(_demand, state) do
     {:noreply, [], state}
   end
 end
